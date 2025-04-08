@@ -1,5 +1,12 @@
-# resume_parser_app.py
 import streamlit as st
+
+# Set page config BEFORE anything else
+st.set_page_config(
+    page_title="Resume Parser", 
+    page_icon="📄",
+    layout="wide"
+)
+
 import re
 import logging
 import subprocess
