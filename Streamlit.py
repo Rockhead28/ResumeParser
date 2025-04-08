@@ -1,4 +1,13 @@
 import streamlit as st
+import logging
+import subprocess
+import sys
+import re
+from datetime import datetime
+from typing import Dict, Optional
+from io import BytesIO
+from docx import Document
+from pypdf import PdfReader
 
 # Set page config BEFORE anything else
 st.set_page_config(
@@ -6,14 +15,6 @@ st.set_page_config(
     page_icon="📄",
     layout="wide"
 )
-
-import re
-import logging
-import subprocess
-import sys
-from typing import Dict, Optional
-from io import BytesIO
-from datetime import datetime
 
 # Install missing packages
 REQUIRED_PACKAGES = {
@@ -32,16 +33,9 @@ if missing:
     for pkg in missing:
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
-        except Exception:
+        except Exception as e:
             st.error(f"Please manually install {pkg} with pip install {pkg}")
-
-# Safe import after installation
-try:
-    from docx import Document
-    from pypdf import PdfReader
-except ImportError:
-    Document = None
-    PdfReader = None
+            logging.error(f"Error installing {pkg}: {e}")
 
 # Configure logging
 logging.basicConfig(
@@ -56,18 +50,16 @@ logging.basicConfig(
 class ResumeParser:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.common_skills = {"python", "java", "javascript", "typescript", "html", "css", "sql", "nosql",
+        self.common_skills = {"python", "java", "javascript", "typescript", "html", "css", "sql", "nosql", 
                                "react", "angular", "vue", "node.js", "django", "flask", "express", "spring",
                                "docker", "kubernetes", "aws", "azure", "gcp", "git", "agile", "scrum", "jira",
-                               "jenkins", "ci/cd", "rest api", "graphql", "mongodb", "mysql", "postgresql",
+                               "jenkins", "ci/cd", "rest api", "graphql", "mongodb", "mysql", "postgresql", 
                                "oracle", "data analysis", "machine learning", "deep learning", "ai", "nltk",
-                               "pandas", "numpy", "tensorflow", "pytorch", "keras", "scikit-learn", "excel",
-                               "powerpoint", "word", "tableau", "power bi", "linux", "windows", "macos",
+                               "pandas", "numpy", "tensorflow", "pytorch", "keras", "scikit-learn", "excel", 
+                               "powerpoint", "word", "tableau", "power bi", "linux", "windows", "macos", 
                                "networking", "security"}
 
     def read_pdf(self, file) -> Optional[str]:
-        if PdfReader is None:
-            return None
         try:
             reader = PdfReader(file)
             text = "".join([page.extract_text() or "" for page in reader.pages])
@@ -77,8 +69,6 @@ class ResumeParser:
             return None
 
     def read_docx(self, file) -> Optional[str]:
-        if Document is None:
-            return None
         try:
             doc = Document(file)
             return "\n".join([p.text for p in doc.paragraphs])
@@ -103,7 +93,7 @@ class ResumeParser:
 
     def extract_skills(self, text: str) -> list:
         text = text.lower()
-        return [skill for skill in self.common_skills if re.search(rf'\\b{re.escape(skill)}\\b', text)]
+        return [skill for skill in self.common_skills if re.search(rf'\b{re.escape(skill)}\b', text)]
 
     def extract_education(self, text: str) -> list:
         patterns = [
