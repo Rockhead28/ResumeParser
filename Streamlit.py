@@ -1,36 +1,48 @@
 import streamlit as st
-import sys
-import subprocess
-import os
-import logging
 import re
-import spacy
-import tempfile
+import logging
 from typing import Dict, Optional
-from docx.api import Document
-from pypdf import PdfReader
-import base64
 from io import BytesIO
+
+# Try importing the required libraries, with graceful fallbacks
+try:
+    from docx import Document
+except ImportError:
+    st.error("python-docx is not installed. Please install it with: pip install python-docx")
+    Document = None
+
+try:
+    from pypdf import PdfReader
+except ImportError:
+    try:
+        from PyPDF2 import PdfReader
+    except ImportError:
+        st.error("pypdf is not installed. Please install it with: pip install pypdf")
+        PdfReader = None
 
 
 class ResumeParser:
     def __init__(self):
-        """Initialize the resume parser with NLP model and logging"""
-        try:
-            # Check if the model is already loaded
-            if 'nlp' not in st.session_state:
-                with st.spinner('Loading NLP model...'):
-                    st.session_state.nlp = spacy.load("en_core_web_sm")
-            self.nlp = st.session_state.nlp
-        except OSError:
-            st.error("Please install the spaCy model: python -m spacy download en_core_web_sm")
-            raise
-
+        """Initialize the resume parser with logging"""
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
+        
+        # Define common skills as a class attribute
+        self.common_skills = {
+            "python", "java", "javascript", "typescript", "html", "css", "sql", "nosql", "react", 
+            "angular", "vue", "node.js", "django", "flask", "express", "spring", "docker",
+            "kubernetes", "aws", "azure", "gcp", "git", "agile", "scrum", "jira", "jenkins",
+            "ci/cd", "rest api", "graphql", "mongodb", "mysql", "postgresql", "oracle", 
+            "data analysis", "machine learning", "deep learning", "ai", "nltk", "pandas",
+            "numpy", "tensorflow", "pytorch", "keras", "scikit-learn", "excel", "powerpoint",
+            "word", "tableau", "power bi", "linux", "windows", "macos", "networking", "security"
+        }
 
     def read_pdf(self, file) -> Optional[str]:
         """Extract text from PDF file"""
+        if PdfReader is None:
+            return "PDF reader library not available. Please install pypdf."
+        
         try:
             reader = PdfReader(file)
             text = "".join([page.extract_text() for page in reader.pages if page.extract_text()])
@@ -41,6 +53,9 @@ class ResumeParser:
 
     def read_docx(self, file) -> Optional[str]:
         """Extract text from DOCX file"""
+        if Document is None:
+            return "DOCX reader library not available. Please install python-docx."
+            
         try:
             doc = Document(file)
             return "\n".join([para.text for para in doc.paragraphs])
@@ -61,11 +76,19 @@ class ResumeParser:
         return match.group(0) if match else None
 
     def extract_skills(self, text: str) -> list:
-        """Extract skills using NLP"""
-        doc = self.nlp(text)
-        common_skills = {"python", "java", "javascript", "sql", "react", "node.js", "docker",
-                         "kubernetes", "aws", "azure", "git", "agile", "scrum"}
-        return list({token.text.lower() for token in doc if token.text.lower() in common_skills})
+        """Extract skills using keyword matching instead of NLP"""
+        # Convert text to lowercase for case-insensitive matching
+        text_lower = text.lower()
+        
+        # Find all skills that appear in the text
+        found_skills = []
+        for skill in self.common_skills:
+            # Use word boundary to avoid partial matches
+            pattern = r'\b' + re.escape(skill) + r'\b'
+            if re.search(pattern, text_lower):
+                found_skills.append(skill)
+                
+        return found_skills
 
     def parse_resume(self, uploaded_file) -> Dict:
         """Main method to parse resume and return structured data"""
@@ -89,16 +112,23 @@ class ResumeParser:
 
     def create_word_document(self, data: Dict) -> BytesIO:
         """Create a Word document from parsed resume data and return as bytes"""
+        if Document is None:
+            st.error("python-docx is required for creating Word documents")
+            return None
+            
         doc = Document()
-        doc.add_heading('Resume Analysis Report', 0).alignment = 1
+        doc.add_heading('Resume Analysis Report', 0)
+        
         doc.add_heading('Contact Information', level=1)
         if data.get("email"):
             doc.add_paragraph(f'Email: {data["email"]}')
         if data.get("phone"):
             doc.add_paragraph(f'Phone: {data["phone"]}')
+            
         if data.get("skills"):
             doc.add_heading('Skills', level=1)
             doc.add_paragraph(', '.join(data["skills"]))
+            
         if data.get("raw_text"):
             doc.add_heading('Original Resume Text', level=1)
             doc.add_paragraph(data["raw_text"])
@@ -110,12 +140,6 @@ class ResumeParser:
         return doc_io
 
 
-def get_download_link(doc_bytes, filename):
-    """Generate a link to download the Word document"""
-    b64 = base64.b64encode(doc_bytes.getvalue()).decode()
-    return f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}">Download Analysis Report</a>'
-
-
 def main():
     st.set_page_config(page_title="Resume Parser", page_icon="📄")
     
@@ -124,6 +148,13 @@ def main():
     Upload your resume (PDF or DOCX) to extract key information.
     The app will identify contact details and skills, and provide a downloadable analysis report.
     """)
+    
+    # Display installation instructions
+    with st.expander("Installation Requirements"):
+        st.code("""
+        pip install streamlit python-docx pypdf
+        streamlit run app.py
+        """)
     
     uploaded_file = st.file_uploader("Choose a resume file", type=["pdf", "docx"])
 
@@ -156,17 +187,19 @@ def main():
                     
                     # Create download link
                     doc_bytes = parser.create_word_document(data)
-                    st.markdown("### Download Report")
-                    st.write("Download a Word document with the analysis results:")
-                    st.download_button(
-                        label="Download Analysis Report",
-                        data=doc_bytes,
-                        file_name="resume_analysis.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
+                    if doc_bytes:
+                        st.markdown("### Download Report")
+                        st.write("Download a Word document with the analysis results:")
+                        st.download_button(
+                            label="Download Analysis Report",
+                            data=doc_bytes,
+                            file_name="resume_analysis.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
                     
             except Exception as e:
                 st.error(f"Error processing resume: {str(e)}")
+                st.error("Make sure you have installed the required packages: python-docx and pypdf")
 
 
 if __name__ == "__main__":
