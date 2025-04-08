@@ -1,4 +1,12 @@
 import streamlit as st
+
+# Set page config BEFORE anything else
+st.set_page_config(
+    page_title="Resume Parser", 
+    page_icon="📄",
+    layout="wide"
+)
+
 import logging
 import subprocess
 import sys
@@ -9,12 +17,7 @@ from io import BytesIO
 from docx import Document
 from pypdf import PdfReader
 
-# Set page config BEFORE anything else
-st.set_page_config(
-    page_title="Resume Parser", 
-    page_icon="📄",
-    layout="wide"
-)
+
 
 # Install missing packages
 REQUIRED_PACKAGES = {
