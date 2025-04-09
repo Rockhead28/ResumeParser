@@ -135,7 +135,7 @@ def get_parser():
     return ResumeParser()
 
 def main():
-    st.set_page_config(page_title="Resume Parser", page_icon="📄", layout="wide")
+    #st.set_page_config(page_title="Resume Parser", page_icon="📄", layout="wide")
     st.title("📄 Resume Parser App")
     st.write("Upload a resume (PDF, DOCX, TXT) to extract contact info, skills, and education.")
 
