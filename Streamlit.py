@@ -112,7 +112,8 @@ class ResumeParser:
                 matches.append(text[start:end].strip())
         return matches
 
-   def create_word_report(self, data: Dict) -> BytesIO:
+
+    def create_word_report(self, data: Dict) -> BytesIO:
         try:
             # Define the path for the template
             template_path = "template.docx"
@@ -126,7 +127,7 @@ class ResumeParser:
             else:
                 # Load the existing template
                 doc = Document(template_path)
-    
+
             # Process replacements
             replacements = {
                 "{{email}}": data.get("email", "N/A"),
@@ -146,7 +147,7 @@ class ResumeParser:
                 if modified:
                     # You could store or print the modified paragraph if necessary
                     pass
-    
+
             # Process any tables in the document
             for t_idx, table in enumerate(doc.tables):
                 for r_idx, row in enumerate(table.rows):
@@ -155,13 +156,13 @@ class ResumeParser:
                         for key, val in replacements.items():
                             if key in original_text:
                                 cell.text = original_text.replace(key, val)
-    
+
             # Save the document to a BytesIO buffer
             buf = BytesIO()
             doc.save(buf)
             buf.seek(0)
             return buf
-    
+
         except Exception as e:
             # Create a simple emergency report in case of an error
             doc = Document()
