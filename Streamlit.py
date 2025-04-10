@@ -113,22 +113,32 @@ class ResumeParser:
         return matches
 
     def create_word_report(self, data: Dict) -> BytesIO:
-        doc = Document()
-        doc.add_heading("Resume Analysis Report", 0)
-        doc.add_heading("Contact Information", level=1)
-        doc.add_paragraph(f"Email: {data.get('email', 'N/A')}")
-        doc.add_paragraph(f"Phone: {data.get('phone', 'N/A')}")
-        doc.add_heading("Skills", level=1)
-        doc.add_paragraph(", ".join(data.get("skills", [])) or "No common skills detected")
-        doc.add_heading("Education", level=1)
-        for edu in data.get("education", []):
-            doc.add_paragraph(f"• {edu}")
-        doc.add_heading("Raw Text", level=1)
-        doc.add_paragraph(data.get("raw_text", ""))
-        buf = BytesIO()
-        doc.save(buf)
-        buf.seek(0)
-        return buf
+        try:
+            template_path = "template.docx"  # Assuming it's in the same directory as your Streamlit script
+            doc = Document(template_path)
+    
+            replacements = {
+                "{{email}}": data.get("email", "N/A"),
+                "{{phone}}": data.get("phone", "N/A"),
+                "{{skills}}": ", ".join(data.get("skills", [])) or "No common skills detected",
+                "{{education}}": "\n".join(f"• {edu}" for edu in data.get("education", [])) or "N/A"
+            }
+    
+            for paragraph in doc.paragraphs:
+                for key, val in replacements.items():
+                    if key in paragraph.text:
+                        paragraph.text = paragraph.text.replace(key, val)
+                        for run in paragraph.runs:
+                            run.font.size = Pt(11)  # Optional: format font size
+    
+            buf = BytesIO()
+            doc.save(buf)
+            buf.seek(0)
+            return buf
+    
+        except Exception as e:
+            self.logger.error(f"Template report creation failed: {e}")
+            return None
 
 @st.cache_resource
 def get_parser():
