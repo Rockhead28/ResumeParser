@@ -113,46 +113,46 @@ class ResumeParser:
         return matches
 
     def create_word_report(self, data: Dict) -> BytesIO:
-    try:
-        template_path = "template.docx"
-        doc = Document(template_path)
-
-        replacements = {
-            "{{email}}": data.get("email", "N/A"),
-            "{{phone}}": data.get("phone", "N/A"),
-            "{{skills}}": ", ".join(data.get("skills", [])) or "No common skills detected",
-            "{{education}}": "\n".join(f"• {edu}" for edu in data.get("education", [])) or "N/A"
-        }
-
-        # Replace placeholders in paragraph runs
-        for paragraph in doc.paragraphs:
-            for key, val in replacements.items():
-                if key in paragraph.text:
-                    for run in paragraph.runs:
-                        if key in run.text:
-                            run.text = run.text.replace(key, val)
-                            run.font.size = Pt(11)  # Optional: apply consistent style
-
-        # Replace placeholders inside table cells
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for paragraph in cell.paragraphs:
-                        for key, val in replacements.items():
-                            if key in paragraph.text:
-                                for run in paragraph.runs:
-                                    if key in run.text:
-                                        run.text = run.text.replace(key, val)
-                                        run.font.size = Pt(11)
-
-        buf = BytesIO()
-        doc.save(buf)
-        buf.seek(0)
-        return buf
-
-    except Exception as e:
-        self.logger.error(f"Template report creation failed: {e}")
-        return None
+        try:
+            template_path = "template.docx"
+            doc = Document(template_path)
+    
+            replacements = {
+                "{{email}}": data.get("email", "N/A"),
+                "{{phone}}": data.get("phone", "N/A"),
+                "{{skills}}": ", ".join(data.get("skills", [])) or "No common skills detected",
+                "{{education}}": "\n".join(f"• {edu}" for edu in data.get("education", [])) or "N/A"
+            }
+    
+            # Replace placeholders in paragraph runs
+            for paragraph in doc.paragraphs:
+                for key, val in replacements.items():
+                    if key in paragraph.text:
+                        for run in paragraph.runs:
+                            if key in run.text:
+                                run.text = run.text.replace(key, val)
+                                run.font.size = Pt(11)  # Optional: apply consistent style
+    
+            # Replace placeholders inside table cells
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            for key, val in replacements.items():
+                                if key in paragraph.text:
+                                    for run in paragraph.runs:
+                                        if key in run.text:
+                                            run.text = run.text.replace(key, val)
+                                            run.font.size = Pt(11)
+    
+            buf = BytesIO()
+            doc.save(buf)
+            buf.seek(0)
+            return buf
+    
+        except Exception as e:
+            self.logger.error(f"Template report creation failed: {e}")
+            return None
 
 
 
