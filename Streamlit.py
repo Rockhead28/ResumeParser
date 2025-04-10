@@ -114,7 +114,7 @@ class ResumeParser:
 
     def create_word_report(self, data: Dict) -> BytesIO:
         try:
-            template_path = "template.docx"  # Assuming it's in the same directory as your Streamlit script
+            template_path = "template.docx"
             doc = Document(template_path)
     
             replacements = {
@@ -127,9 +127,20 @@ class ResumeParser:
             for paragraph in doc.paragraphs:
                 for key, val in replacements.items():
                     if key in paragraph.text:
-                        paragraph.text = paragraph.text.replace(key, val)
                         for run in paragraph.runs:
-                            run.font.size = Pt(11)  # Optional: format font size
+                            if key in run.text:
+                                run.text = run.text.replace(key, val)
+    
+            # Also search in tables if template contains placeholders inside tables
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            for key, val in replacements.items():
+                                if key in paragraph.text:
+                                    for run in paragraph.runs:
+                                        if key in run.text:
+                                            run.text = run.text.replace(key, val)
     
             buf = BytesIO()
             doc.save(buf)
@@ -139,6 +150,7 @@ class ResumeParser:
         except Exception as e:
             self.logger.error(f"Template report creation failed: {e}")
             return None
+
 
 @st.cache_resource
 def get_parser():
