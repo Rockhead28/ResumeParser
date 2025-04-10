@@ -16,7 +16,7 @@ from typing import Dict, Optional
 from io import BytesIO
 from docx import Document
 from pypdf import PdfReader
-from docx.shared import Pt
+
 
 
 # Install missing packages
@@ -112,71 +112,23 @@ class ResumeParser:
                 matches.append(text[start:end].strip())
         return matches
 
-
     def create_word_report(self, data: Dict) -> BytesIO:
-        try:
-            # Define the path for the template
-            template_path = "template.docx"
-            
-            # Check if the template exists
-            if not os.path.exists(template_path):
-                # Create a default template if the custom template doesn't exist
-                doc = Document()
-                doc.add_heading("Default Template", 0)
-                doc.add_paragraph("This is a default template.")
-            else:
-                # Load the existing template
-                doc = Document(template_path)
-
-            # Process replacements
-            replacements = {
-                "{{email}}": data.get("email", "N/A"),
-                "{{phone}}": data.get("phone", "N/A"),
-                "{{skills}}": ", ".join(data.get("skills", [])) or "No common skills detected",
-                "{{education}}": "\n".join(f"• {edu}" for edu in data.get("education", [])) or "N/A"
-            }
-            
-            # Replace placeholders in paragraphs
-            for i, paragraph in enumerate(doc.paragraphs):
-                original_text = paragraph.text
-                modified = False
-                for key, val in replacements.items():
-                    if key in original_text:
-                        paragraph.text = original_text.replace(key, val)
-                        modified = True
-                if modified:
-                    # You could store or print the modified paragraph if necessary
-                    pass
-
-            # Process any tables in the document
-            for t_idx, table in enumerate(doc.tables):
-                for r_idx, row in enumerate(table.rows):
-                    for c_idx, cell in enumerate(row.cells):
-                        original_text = cell.text
-                        for key, val in replacements.items():
-                            if key in original_text:
-                                cell.text = original_text.replace(key, val)
-
-            # Save the document to a BytesIO buffer
-            buf = BytesIO()
-            doc.save(buf)
-            buf.seek(0)
-            return buf
-
-        except Exception as e:
-            # Create a simple emergency report in case of an error
-            doc = Document()
-            doc.add_heading("Resume Analysis - Error Recovery", 0)
-            doc.add_paragraph(f"Error creating formatted report: {str(e)}")
-            doc.add_paragraph(f"Email: {data.get('email', 'N/A')}")
-            doc.add_paragraph(f"Phone: {data.get('phone', 'N/A')}")
-            
-            buf = BytesIO()
-            doc.save(buf)
-            buf.seek(0)
-            return buf
-
-
+        doc = Document()
+        doc.add_heading("Resume Analysis Report", 0)
+        doc.add_heading("Contact Information", level=1)
+        doc.add_paragraph(f"Email: {data.get('email', 'N/A')}")
+        doc.add_paragraph(f"Phone: {data.get('phone', 'N/A')}")
+        doc.add_heading("Skills", level=1)
+        doc.add_paragraph(", ".join(data.get("skills", [])) or "No common skills detected")
+        doc.add_heading("Education", level=1)
+        for edu in data.get("education", []):
+            doc.add_paragraph(f"• {edu}")
+        doc.add_heading("Raw Text", level=1)
+        doc.add_paragraph(data.get("raw_text", ""))
+        buf = BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        return buf
 
 @st.cache_resource
 def get_parser():
@@ -189,33 +141,6 @@ def main():
 
     uploaded_file = st.file_uploader("Upload Resume", type=["pdf", "docx", "txt"])
 
-
-    # Add this somewhere in your main() function
-    if st.checkbox("Debug mode"):
-        import os
-        st.subheader("Path Debugging Information")
-        st.write(f"Current working directory: {os.getcwd()}")
-        st.write(f"__file__ value: {__file__}")
-        st.write(f"Script directory: {os.path.dirname(os.path.abspath(__file__))}")
-        
-        # List files in current directory
-        st.write("Files in current directory:")
-        files = os.listdir(os.getcwd())
-        st.write(files)
-        
-        # Check if template exists in various locations
-        locations = [
-            "template.docx",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.docx"),
-            os.path.abspath("template.docx"),
-            os.path.join(os.getcwd(), "template.docx")
-        ]
-        
-        for loc in locations:
-            st.write(f"Template at {loc}: {'Exists' if os.path.exists(loc) else 'Not found'}")
-
-
-    
     if uploaded_file:
         st.info(f"File uploaded: {uploaded_file.name}")
         parser = get_parser()
