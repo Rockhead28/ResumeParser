@@ -114,36 +114,67 @@ class ResumeParser:
 
     def create_word_report(self, data: Dict) -> BytesIO:
         try:
-            template_path = "template.docx"
+            import os
+            import streamlit as st
+            
+            # Try multiple possible locations for the template
+            possible_paths = [
+                "template.docx",  # Current working directory
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.docx"),  # Script directory
+                os.path.abspath("template.docx"),  # Absolute path in current directory
+                os.path.join(os.getcwd(), "template.docx")  # Explicit current working directory
+            ]
+            
+            # Log all the paths we're trying
+            for path in possible_paths:
+                self.logger.info(f"Checking for template at: {path}")
+                if os.path.exists(path):
+                    template_path = path
+                    self.logger.info(f"Template found at: {template_path}")
+                    break
+            else:
+                # If template not found, create an in-memory document
+                self.logger.warning("Template not found at any location, using basic document")
+                doc = Document()
+                
+                # Create a basic report without template
+                doc.add_heading("Resume Analysis Report", 0)
+                
+                doc.add_heading("Contact Information", level=1)
+                doc.add_paragraph(f"Email: {data.get('email', 'N/A')}")
+                doc.add_paragraph(f"Phone: {data.get('phone', 'N/A')}")
+                
+                doc.add_heading("Skills", level=1)
+                skills_text = ", ".join(data.get("skills", [])) or "No common skills detected"
+                doc.add_paragraph(skills_text)
+                
+                doc.add_heading("Education", level=1)
+                for edu in data.get("education", []):
+                    doc.add_paragraph(f"• {edu}", style="List Bullet")
+                if not data.get("education"):
+                    doc.add_paragraph("N/A")
+                    
+                buf = BytesIO()
+                doc.save(buf)
+                buf.seek(0)
+                return buf
+                
+            # Use the found template
             doc = Document(template_path)
-    
+            
             replacements = {
                 "{{email}}": data.get("email", "N/A"),
                 "{{phone}}": data.get("phone", "N/A"),
                 "{{skills}}": ", ".join(data.get("skills", [])) or "No common skills detected",
                 "{{education}}": "\n".join(f"• {edu}" for edu in data.get("education", [])) or "N/A"
             }
-    
-            # Replace placeholders in paragraph runs
+        
             for paragraph in doc.paragraphs:
                 for key, val in replacements.items():
                     if key in paragraph.text:
+                        paragraph.text = paragraph.text.replace(key, val)
                         for run in paragraph.runs:
-                            if key in run.text:
-                                run.text = run.text.replace(key, val)
-                                run.font.size = Pt(11)  # Optional: apply consistent style
-    
-            # Replace placeholders inside table cells
-            for table in doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        for paragraph in cell.paragraphs:
-                            for key, val in replacements.items():
-                                if key in paragraph.text:
-                                    for run in paragraph.runs:
-                                        if key in run.text:
-                                            run.text = run.text.replace(key, val)
-                                            run.font.size = Pt(11)
+                            run.font.size = Pt(11)
     
             buf = BytesIO()
             doc.save(buf)
@@ -151,8 +182,16 @@ class ResumeParser:
             return buf
     
         except Exception as e:
-            self.logger.error(f"Template report creation failed: {e}")
-            return None
+            self.logger.error(f"Report creation failed: {e}")
+            # Create a simple emergency report
+            doc = Document()
+            doc.add_heading("Resume Analysis - Error Recovery", 0)
+            doc.add_paragraph(f"Error creating formatted report: {str(e)}")
+            
+            buf = BytesIO()
+            doc.save(buf)
+            buf.seek(0)
+            return buf
 
 
 
