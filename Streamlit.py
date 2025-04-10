@@ -112,80 +112,22 @@ class ResumeParser:
                 matches.append(text[start:end].strip())
         return matches
 
-    def create_word_report(self, data: Dict) -> BytesIO:
+   def create_word_report(self, data: Dict) -> BytesIO:
         try:
-            import os
-            import streamlit as st
+            # Define the path for the template
+            template_path = "template.docx"
             
-            # Try multiple possible locations for the template
-            possible_paths = [
-                "template.docx",  # Current working directory
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.docx"),  # Script directory
-                os.path.abspath("template.docx"),  # Absolute path in current directory
-                os.path.join(os.getcwd(), "template.docx")  # Explicit current working directory
-            ]
-            
-            # Log all the paths we're trying
-            template_found = False
-            for path in possible_paths:
-                self.logger.info(f"Checking for template at: {path}")
-                if os.path.exists(path):
-                    template_path = path
-                    template_found = True
-                    self.logger.info(f"Template found at: {template_path}")
-                    
-                    # Check file size to ensure it's not empty
-                    file_size = os.path.getsize(template_path)
-                    self.logger.info(f"Template file size: {file_size} bytes")
-                    if file_size == 0:
-                        self.logger.warning(f"Template file exists but is empty: {template_path}")
-                        continue
-                    
-                    # Try to load the template
-                    try:
-                        self.logger.info(f"Attempting to load template from: {template_path}")
-                        doc = Document(template_path)
-                        self.logger.info("Successfully loaded template document")
-                        break
-                    except Exception as template_error:
-                        self.logger.error(f"Error loading template from {template_path}: {template_error}")
-                        continue
-            else:
-                # This block runs if no template was successfully loaded
-                self.logger.warning("No template could be loaded, using basic document")
-                template_found = False if template_found else False  # For clarity in logs
+            # Check if the template exists
+            if not os.path.exists(template_path):
+                # Create a default template if the custom template doesn't exist
                 doc = Document()
-                
-                # Create a basic report without template
-                doc.add_heading("Resume Analysis Report", 0)
-                
-                doc.add_heading("Contact Information", level=1)
-                doc.add_paragraph(f"Email: {data.get('email', 'N/A')}")
-                doc.add_paragraph(f"Phone: {data.get('phone', 'N/A')}")
-                
-                doc.add_heading("Skills", level=1)
-                skills_text = ", ".join(data.get("skills", [])) or "No common skills detected"
-                doc.add_paragraph(skills_text)
-                
-                doc.add_heading("Education", level=1)
-                for edu in data.get("education", []):
-                    doc.add_paragraph(f"• {edu}", style="List Bullet")
-                if not data.get("education"):
-                    doc.add_paragraph("N/A")
-                    
-                buf = BytesIO()
-                doc.save(buf)
-                buf.seek(0)
-                return buf
-            
-            # If we get here, we've successfully loaded the template
-            self.logger.info("Processing template replacements")
-            
-            # Store original paragraphs for debugging
-            original_paragraphs = [p.text for p in doc.paragraphs]
-            self.logger.info(f"Template has {len(original_paragraphs)} paragraphs")
-            self.logger.info(f"First few paragraphs: {original_paragraphs[:3]}")
-            
+                doc.add_heading("Default Template", 0)
+                doc.add_paragraph("This is a default template.")
+            else:
+                # Load the existing template
+                doc = Document(template_path)
+    
+            # Process replacements
             replacements = {
                 "{{email}}": data.get("email", "N/A"),
                 "{{phone}}": data.get("phone", "N/A"),
@@ -193,86 +135,35 @@ class ResumeParser:
                 "{{education}}": "\n".join(f"• {edu}" for edu in data.get("education", [])) or "N/A"
             }
             
-            # Log replacements for debugging
-            self.logger.info(f"Replacements to be made: {replacements}")
-            
-            # Process all paragraphs to replace placeholders while preserving formatting
+            # Replace placeholders in paragraphs
             for i, paragraph in enumerate(doc.paragraphs):
-                # Check if paragraph contains any placeholder
                 original_text = paragraph.text
                 modified = False
                 for key, val in replacements.items():
                     if key in original_text:
-                        self.logger.info(f"Found placeholder {key} in paragraph {i}")
+                        paragraph.text = original_text.replace(key, val)
                         modified = True
-                        
-                        # Store formatting of runs
-                        runs_formatting = []
-                        for run in paragraph.runs:
-                            runs_formatting.append({
-                                'text': run.text,
-                                'bold': run.bold,
-                                'italic': run.italic,
-                                'underline': run.underline,
-                                'font_size': run.font.size if hasattr(run.font, 'size') and run.font.size else None,
-                                'font_name': run.font.name if hasattr(run.font, 'name') and run.font.name else None,
-                            })
-                        
-                        # Clear the paragraph
-                        for j in range(len(paragraph.runs)-1, -1, -1):
-                            p = paragraph._p
-                            p.remove(paragraph.runs[j]._r)
-                        
-                        # Replace the placeholder in the text
-                        new_text = original_text.replace(key, val)
-                        
-                        # Re-add the text while trying to preserve formatting
-                        paragraph.add_run(new_text)
-                        
-                        # Try to restore formatting of the first run from original formatting
-                        if runs_formatting:
-                            for attr, value in runs_formatting[0].items():
-                                if attr != 'text' and value is not None:
-                                    if attr == 'font_size':
-                                        paragraph.runs[0].font.size = value
-                                    elif attr == 'font_name':
-                                        paragraph.runs[0].font.name = value
-                                    else:
-                                        setattr(paragraph.runs[0], attr, value)
-                
                 if modified:
-                    self.logger.info(f"Modified paragraph {i}: '{original_text}' -> '{paragraph.text}'")
-            
+                    # You could store or print the modified paragraph if necessary
+                    pass
+    
             # Process any tables in the document
-            table_count = len(doc.tables)
-            self.logger.info(f"Template has {table_count} tables")
-            
             for t_idx, table in enumerate(doc.tables):
                 for r_idx, row in enumerate(table.rows):
                     for c_idx, cell in enumerate(row.cells):
-                        for p_idx, paragraph in enumerate(cell.paragraphs):
-                            original_text = paragraph.text
-                            modified = False
-                            for key, val in replacements.items():
-                                if key in original_text:
-                                    modified = True
-                                    paragraph.text = original_text.replace(key, val)
-                            if modified:
-                                self.logger.info(f"Modified text in table {t_idx}, row {r_idx}, cell {c_idx}: '{original_text}' -> '{paragraph.text}'")
-            
-            self.logger.info("Finished processing template, saving document")
+                        original_text = cell.text
+                        for key, val in replacements.items():
+                            if key in original_text:
+                                cell.text = original_text.replace(key, val)
+    
+            # Save the document to a BytesIO buffer
             buf = BytesIO()
             doc.save(buf)
             buf.seek(0)
-            self.logger.info("Document saved successfully")
             return buf
     
         except Exception as e:
-            self.logger.error(f"Report creation failed: {e}")
-            import traceback
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            
-            # Create a simple emergency report
+            # Create a simple emergency report in case of an error
             doc = Document()
             doc.add_heading("Resume Analysis - Error Recovery", 0)
             doc.add_paragraph(f"Error creating formatted report: {str(e)}")
