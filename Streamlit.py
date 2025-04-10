@@ -206,6 +206,33 @@ def main():
 
     uploaded_file = st.file_uploader("Upload Resume", type=["pdf", "docx", "txt"])
 
+
+    # Add this somewhere in your main() function
+    if st.checkbox("Debug mode"):
+        import os
+        st.subheader("Path Debugging Information")
+        st.write(f"Current working directory: {os.getcwd()}")
+        st.write(f"__file__ value: {__file__}")
+        st.write(f"Script directory: {os.path.dirname(os.path.abspath(__file__))}")
+        
+        # List files in current directory
+        st.write("Files in current directory:")
+        files = os.listdir(os.getcwd())
+        st.write(files)
+        
+        # Check if template exists in various locations
+        locations = [
+            "template.docx",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.docx"),
+            os.path.abspath("template.docx"),
+            os.path.join(os.getcwd(), "template.docx")
+        ]
+        
+        for loc in locations:
+            st.write(f"Template at {loc}: {'Exists' if os.path.exists(loc) else 'Not found'}")
+
+
+    
     if uploaded_file:
         st.info(f"File uploaded: {uploaded_file.name}")
         parser = get_parser()
